@@ -1,0 +1,307 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ room_name }} — WatchParty</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/zoom.css">
+</head>
+<body class="zoom-body light-theme">
+
+  <!-- Zoom Top Status Bar -->
+  <header class="zoom-top-bar">
+    <div class="top-bar-left">
+      <div class="meeting-info-btn" id="meeting-info-trigger" title="Meeting Information">
+        <span class="info-shield">🛡️</span>
+        <span class="meeting-title-text">{{ room_name }}</span>
+      </div>
+      <div class="code-pill" id="copy-code-badge" title="Click to copy 6-digit code">
+        <span class="code-label">MEETING CODE:</span>
+        <strong class="code-number" id="room-code-val">{{ code }}</strong>
+        <span class="copy-hint">📋</span>
+      </div>
+    </div>
+
+    <div class="top-bar-center">
+      <div class="view-switcher">
+        <button class="view-btn active" id="btn-view-gallery">👥 10-Person Gallery</button>
+        <button class="view-btn" id="btn-view-theater">🎬 Watch Party Theater</button>
+      </div>
+      <div class="sync-status-badge">
+        <span class="green-pulse-dot"></span>
+        <span id="sync-text">Live Sync (22ms)</span>
+      </div>
+    </div>
+
+    <div class="top-bar-right">
+      <button class="btn-top-invite" id="btn-top-invite">➕ Copy Invite Link</button>
+      <div class="user-profile-badge">
+        <span class="user-avatar-sm">{{ user_name[:2].upper() }}</span>
+        <span class="user-name-text">{{ user_name }}</span>
+        <span class="role-tag" id="current-role-tag">Host</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Conference Layout -->
+  <div class="conference-container">
+
+    <!-- Center Stage: Switches between 10-Person Video Grid and Movie Theater -->
+    <main class="conference-stage" id="conference-stage">
+
+      <!-- View A: 10-Person Zoom Gallery Grid (3x3) -->
+      <div class="zoom-gallery-grid" id="gallery-grid">
+        <!-- 9 Video Tiles populated via JavaScript & Initial Server Render -->
+      </div>
+
+      <!-- View B: Synchronized Movie Theater Mode (Hidden by default, toggled via button) -->
+      <div class="theater-mode-view" id="theater-mode-view" style="display:none;">
+        <div class="video-top-strip">
+          <div class="video-input-wrapper">
+            <input type="text" id="custom-video-url" placeholder="Paste any YouTube URL or video link..." value="{{ video_url }}">
+            <button class="btn-load-vid" id="btn-load-vid">▶ Load for Everyone</button>
+          </div>
+          <div class="strip-notice">Synced across all 9 participants in real-time</div>
+        </div>
+
+        <div class="theater-player-frame" id="theater-player-frame">
+          <div id="yt-player-target"></div>
+          <video id="html5-video-player" controls style="display:none;width:100%;height:100%;"></video>
+        </div>
+
+        <!-- Synchronized Playback Control Bar -->
+        <div class="theater-playback-bar">
+          <button class="sync-ctrl-btn" id="ctrl-back-10" title="Rewind 10s">⏪ 10s</button>
+          <button class="sync-ctrl-btn play-main-btn" id="ctrl-play-pause">▶ Play</button>
+          <button class="sync-ctrl-btn" id="ctrl-fwd-10" title="Forward 10s">10s ⏩</button>
+          <div class="timeline-slider-box">
+            <span id="time-current">0:00</span>
+            <input type="range" id="seek-slider" min="0" max="100" value="0" step="0.1">
+            <span id="time-duration">0:00</span>
+          </div>
+          <div class="sound-slider-box">
+            <span>🔊</span>
+            <input type="range" id="vol-slider" min="0" max="100" value="80">
+          </div>
+        </div>
+      </div>
+
+      <!-- Floating Reactions Overlay Container -->
+      <div class="reactions-floating-zone" id="reactions-floating-zone"></div>
+    </main>
+
+    <!-- Conference-Style White Side Window (Tabs: Participants, Chat, Polls) -->
+    <aside class="zoom-side-window" id="zoom-side-window">
+      <!-- Window Tabs Header -->
+      <div class="side-window-tabs">
+        <button class="tab-btn active" data-target="panel-participants">
+          👥 People (<span id="people-count">10</span>)
+        </button>
+        <button class="tab-btn" data-target="panel-chat">
+          💬 Chat <span class="tab-badge" id="chat-badge" style="display:none">1</span>
+        </button>
+        <button class="tab-btn" data-target="panel-polls">
+          📊 Polls
+        </button>
+        <button class="close-side-panel-btn" id="btn-close-side" title="Close Panel">✕</button>
+      </div>
+
+      <!-- Tab 1: Participants Panel (Conference-Style) -->
+      <div class="side-tab-content active" id="panel-participants">
+        <div class="participants-search-bar">
+          <input type="text" id="search-participants-input" placeholder="Find a participant...">
+        </div>
+        <div class="participants-scroll-list" id="participants-scroll-list">
+          <!-- Rendered dynamically -->
+        </div>
+        <div class="participants-bottom-actions">
+          <button class="btn-side-action" id="btn-mute-all">🔇 Mute All</button>
+          <button class="btn-side-action primary-side" id="btn-invite-side">📋 Copy Code ({{ code }})</button>
+        </div>
+      </div>
+
+      <!-- Tab 2: Live Chat Panel -->
+      <div class="side-tab-content" id="panel-chat">
+        <div class="chat-recipients-bar">
+          <span>To: <strong>Everyone in Meeting</strong></span>
+        </div>
+        <div class="chat-message-stream" id="chat-message-stream">
+          <!-- Messages -->
+        </div>
+        <div class="chat-composer-box">
+          <div class="chat-quick-emojis">
+            <span class="quick-em" onclick="insertEmoji('🍿')">🍿</span>
+            <span class="quick-em" onclick="insertEmoji('❤️')">❤️</span>
+            <span class="quick-em" onclick="insertEmoji('😂')">😂</span>
+            <span class="quick-em" onclick="insertEmoji('🔥')">🔥</span>
+            <span class="quick-em" onclick="insertEmoji('👏')">👏</span>
+          </div>
+          <form id="chat-form" class="chat-form-row">
+            <input type="text" id="chat-text-input" placeholder="Type message to 10 people..." autocomplete="off">
+            <button type="submit" class="btn-chat-send">Send</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Tab 3: Group Polls Panel -->
+      <div class="side-tab-content" id="panel-polls">
+        <div class="polls-container">
+          <div class="create-poll-card">
+            <h4>📊 Create a Group Poll</h4>
+            <input type="text" id="new-poll-q" placeholder="What movie should we watch next?">
+            <div id="new-poll-options">
+              <input type="text" class="poll-opt-inp" placeholder="Option 1: Inception">
+              <input type="text" class="poll-opt-inp" placeholder="Option 2: Interstellar">
+            </div>
+            <button class="btn-text-sm" id="btn-add-poll-opt">+ Add Option</button>
+            <button class="btn-launch-poll" id="btn-launch-poll">Launch Poll to Room</button>
+          </div>
+
+          <div class="active-polls-list" id="active-polls-list">
+            <!-- Active Polls displayed here -->
+          </div>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- Zoom Bottom Floating Dock (Clean Light Theme) -->
+  <footer class="zoom-bottom-dock">
+    <div class="dock-container">
+
+      <!-- Left Media Controls -->
+      <div class="dock-group">
+        <button class="dock-btn" id="dock-btn-mute" title="Mute/Unmute Mic">
+          <div class="dock-icon-wrapper" id="dock-mic-icon">🎙️</div>
+          <span class="dock-label" id="dock-mic-label">Mute</span>
+        </button>
+        <button class="dock-btn" id="dock-btn-video" title="Start/Stop Video">
+          <div class="dock-icon-wrapper" id="dock-cam-icon">📹</div>
+          <span class="dock-label" id="dock-cam-label">Stop Video</span>
+        </button>
+      </div>
+
+      <!-- Center Meeting Controls -->
+      <div class="dock-group dock-center-group">
+        <button class="dock-btn active" id="dock-btn-people">
+          <div class="dock-icon-wrapper">👥</div>
+          <span class="dock-label">Participants (<span id="dock-people-count">10</span>)</span>
+        </button>
+        <button class="dock-btn" id="dock-btn-chat">
+          <div class="dock-icon-wrapper">💬</div>
+          <span class="dock-label">Chat</span>
+        </button>
+        <button class="dock-btn" id="dock-btn-theater">
+          <div class="dock-icon-wrapper">🎬</div>
+          <span class="dock-label">Watch Movie</span>
+        </button>
+        <button class="dock-btn" id="dock-btn-polls">
+          <div class="dock-icon-wrapper">📊</div>
+          <span class="dock-label">Polls</span>
+        </button>
+
+        <!-- Zoom Reactions Popup Trigger -->
+        <div class="reaction-dock-wrapper">
+          <button class="dock-btn" id="dock-btn-reactions">
+            <div class="dock-icon-wrapper">😄</div>
+            <span class="dock-label">Reactions</span>
+          </button>
+          <div class="zoom-reaction-menu" id="zoom-reaction-menu" style="display:none;">
+            <button class="react-pill" data-emoji="👏">👏</button>
+            <button class="react-pill" data-emoji="👍">👍</button>
+            <button class="react-pill" data-emoji="❤️">❤️</button>
+            <button class="react-pill" data-emoji="😂">😂</button>
+            <button class="react-pill" data-emoji="😮">😮</button>
+            <button class="react-pill" data-emoji="🎉">🎉</button>
+          </div>
+        </div>
+
+        <button class="dock-btn" id="dock-btn-host-transfer" title="Transfer Host Controls">
+          <div class="dock-icon-wrapper">👑</div>
+          <span class="dock-label">Host Transfer</span>
+        </button>
+      </div>
+
+      <!-- Right Exit Control -->
+      <div class="dock-group">
+        <button class="btn-leave-meeting" id="btn-leave-meeting">End Meeting</button>
+      </div>
+
+    </div>
+  </footer>
+
+  <!-- Host Transfer Modal -->
+  <div class="modal-backdrop" id="modal-host-transfer" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>👑 Transfer Host Role</h3>
+        <button class="modal-close" onclick="closeModal('modal-host-transfer')">✕</button>
+      </div>
+      <p class="modal-desc">Select any participant in the 10-person room to make them the new meeting host:</p>
+      <div class="host-candidates-list" id="host-candidates-list">
+        <!-- Rendered via JS -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('modal-host-transfer')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Meeting Information Shield Modal -->
+  <div class="modal-backdrop" id="modal-meeting-info" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>🛡️ WatchParty Meeting Info</h3>
+        <button class="modal-close" onclick="closeModal('modal-meeting-info')">✕</button>
+      </div>
+      <div class="meeting-details-table">
+        <div class="detail-row">
+          <span class="detail-label">Meeting Topic:</span>
+          <span class="detail-val">{{ room_name }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Random 6-Digit Code:</span>
+          <span class="detail-val highlight-val">{{ code }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Current Host:</span>
+          <span class="detail-val" id="info-host-name">{{ host_name }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Active Participants:</span>
+          <span class="detail-val">10 People Connected</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Direct Invite URL:</span>
+          <div class="invite-url-copy-box">
+            <input type="text" id="direct-invite-url" readonly value="">
+            <button class="btn-copy-url" id="btn-copy-invite-url">Copy Link</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('modal-meeting-info')">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-toast-box"></div>
+
+  <!-- Variables from Flask -->
+  <script>
+    const MEETING_CODE = "{{ code }}";
+    const USER_NAME = "{{ user_name }}";
+    const IS_HOST_INIT = {{ 'true' if is_host == '1' else 'false' }};
+    const VIDEO_URL_INIT = "{{ video_url }}";
+    const HOST_NAME_INIT = "{{ host_name }}";
+  </script>
+  <!-- Socket.IO & YouTube IFrame API -->
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script src="/static/js/room.js"></script>
+</body>
+</html>
