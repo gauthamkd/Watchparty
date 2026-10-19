@@ -22,7 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger("watchparty")
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "zoomparty-secret-key-5001")
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "change-this-secret-before-production")
 
 socketio = SocketIO(
     app,
@@ -229,6 +229,37 @@ def handle_join_meeting(data):
 
     # Broadcast updated participant list to all in room
     emit("update_participants", {"participants": list(room["participants"].values())}, to=code)
+
+
+@socketio.on("disconnect")
+def handle_disconnect(reason=None):
+    sid = request.sid
+    for code, room_data in list(rooms.items()):
+        if sid in room_data["participants"]:
+            participant = room_data["participants"].pop(sid)
+            if room_data.get("host_sid") == sid:
+                room_data["host_sid"] = None
+                remaining = list(room_data["participants"].values())
+                if remaining:
+                    new_host = remaining[0]
+                    new_host["is_host"] = True
+                    new_host["role"] = "Host"
+                    room_data["host_sid"] = new_host["id"]
+                    room_data["host_name"] = new_host["name"]
+                    socketio.emit("host_changed", {
+                        "new_host_id": new_host["id"],
+                        "new_host_name": new_host["name"]
+                    }, to=code)
+            socketio.emit("update_participants", {
+                "participants": list(room_data["participants"].values())
+            }, to=code)
+            socketio.emit("new_chat_message", {
+                "name": "System",
+                "text": f"{participant['name']} left the party.",
+                "time": datetime.now().strftime("%I:%M %p"),
+                "is_sys": True
+            }, to=code)
+            break
 
 
 @socketio.on("play_video")
