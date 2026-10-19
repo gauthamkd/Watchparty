@@ -262,6 +262,37 @@ def handle_disconnect(reason=None):
             break
 
 
+@socketio.on("webrtc_signal")
+def handle_webrtc_signal(data):
+    code = data.get("code")
+    target_id = data.get("target_id")
+    if code not in rooms or not target_id:
+        return
+    if target_id not in rooms[code]["participants"]:
+        return
+    emit("webrtc_signal", {
+        "from_id": request.sid,
+        "payload": data.get("payload", {})
+    }, to=target_id)
+
+
+@socketio.on("screen_share_started")
+def handle_screen_share_started(data):
+    code = data.get("code")
+    if code in rooms and request.sid in rooms[code]["participants"]:
+        emit("screen_share_started", {
+            "sender_id": request.sid,
+            "sender_name": rooms[code]["participants"][request.sid]["name"]
+        }, to=code)
+
+
+@socketio.on("screen_share_stopped")
+def handle_screen_share_stopped(data):
+    code = data.get("code")
+    if code in rooms:
+        emit("screen_share_stopped", {"sender_id": request.sid}, to=code)
+
+
 @socketio.on("play_video")
 def handle_play(data):
     code = data.get("code")
