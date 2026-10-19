@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WatchParty — Watch Movies with 10 Friends</title>
+  <title>WatchParty — Watch Movies Together</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
@@ -16,7 +16,7 @@
       <div class="brand">
         <div class="brand-logo">📹</div>
         <span class="brand-text">Watch<strong>Party</strong></span>
-        <span class="brand-pill">10-Person Room</span>
+        <span class="brand-pill">Live Watch Party</span>
       </div>
       <div class="nav-actions">
         <span class="random-badge">Generated Code: <strong>{{ suggested_code }}</strong></span>
@@ -29,11 +29,11 @@
   <main class="hero-container">
     <div class="hero-content">
       <div class="pill-announcement">
-        ✨ Synchronized Watch Party • Conference-Style 10-Person Video Grid • Clean White Theme
+        ✨ Synchronized Watch Party • Live Participants • Clean White Theme
       </div>
       <h1 class="hero-title">Watch Movies Together with Friends in a Conference-Style Room</h1>
       <p class="hero-subtitle">
-        Jump straight into an interactive 10-person meeting room. Synchronize YouTube videos, react with live floating emojis, vote on group polls, transfer host controls, and chat in real-time.
+        Create a room and invite friends to join from their own devices. Synchronize YouTube videos, react with live floating emojis, vote on group polls, transfer host controls, and chat in real-time.
       </p>
 
       {% if error %}
@@ -49,7 +49,7 @@
           <div class="card-header">
             <div class="card-icon bg-blue">🎥</div>
             <div>
-              <h3>Start Instant 10-Person Room</h3>
+              <h3>Start a Watch Party</h3>
               <p>Host a new meeting with a 6-digit code</p>
             </div>
           </div>
@@ -68,7 +68,7 @@
               <input type="url" name="video_url" id="host_video_url" value="https://www.youtube.com/watch?v=zSWdZVtXT7E" placeholder="Paste YouTube URL">
             </div>
             <button type="submit" class="btn btn-primary btn-full">
-              🚀 Launch 10-Person Room (Code: {{ suggested_code }})
+              🚀 Create Watch Party (Code: {{ suggested_code }})
             </button>
           </form>
         </div>
@@ -244,8 +244,8 @@
       <div class="feature-strip">
         <div class="feature-item">
           <span class="f-icon">👥</span>
-          <h4>10 Participants Grid</h4>
-          <p>Real Zoom gallery view with avatars & mic meters</p>
+          <h4>Live Participant Grid</h4>
+          <p>Shows people who have actually joined the room</p>
         </div>
         <div class="feature-item">
           <span class="f-icon">⚡</span>
