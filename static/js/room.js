@@ -1,4 +1,4 @@
-﻿/* ZoomParty - Interactive 10-Person Meeting Room Logic (Clean White Theme) */
+/* WatchParty - Live Meeting Room Logic (Clean White Theme) */
 "use strict";
 
 // Meeting State
@@ -155,7 +155,7 @@ function initSocket() {
 }
 
 // ---------------------------------------------------------------------------
-// 10-Person Zoom Gallery Grid Rendering
+// Live participant gallery rendering
 // ---------------------------------------------------------------------------
 function renderParticipantsGrid() {
   var grid = document.getElementById("gallery-grid");
@@ -187,25 +187,6 @@ function renderParticipantsGrid() {
     grid.appendChild(tile);
   });
 }
-
-// ---------------------------------------------------------------------------
-// Simulated Voice Activity (Makes 10-Person Grid Feel Real & Alive)
-// ---------------------------------------------------------------------------
-setInterval(function () {
-  if (meetingState.participants.length === 0) return;
-  // Pick random participant to "talk"
-  var randIdx = Math.floor(Math.random() * meetingState.participants.length);
-  var p = meetingState.participants[randIdx];
-  if (!p || !p.audio) return;
-
-  var tile = document.getElementById("tile-" + p.id);
-  if (tile) {
-    tile.classList.add("speaking");
-    setTimeout(function () {
-      tile.classList.remove("speaking");
-    }, 1800);
-  }
-}, 3500);
 
 // ---------------------------------------------------------------------------
 // Zoom Participants Window Rendering
