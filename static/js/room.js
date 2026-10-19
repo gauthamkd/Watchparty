@@ -17,6 +17,8 @@ var meetingState = {
   playerReady: false,
   isPlaying: false,
   duration: 0,
+  screenStream: null,
+  screenPeers: {},
 };
 
 // ---------------------------------------------------------------------------
@@ -61,6 +63,16 @@ function initSocket() {
       name: meetingState.userName,
       is_host: meetingState.isHost
     });
+  });
+
+  meetingState.socket.on("webrtc_signal", handleWebRTCSignal);
+
+  meetingState.socket.on("screen_share_started", function (data) {
+    if (data.sender_id !== meetingState.socket.id) showToast(data.sender_name + " is sharing their screen. Audio requires selecting tab/system audio when prompted.");
+  });
+
+  meetingState.socket.on("screen_share_stopped", function (data) {
+    if (data.sender_id !== meetingState.socket.id) clearRemoteScreenShare();
   });
 
   meetingState.socket.on("meeting_state", function (data) {
@@ -395,6 +407,9 @@ window.onYouTubeIframeAPIReady = function () {
     events: {
       onReady: function () {
         meetingState.playerReady = true;
+        var initialUrl = meetingState.pendingVideoUrl || VIDEO_URL_INIT;
+        if (extractYouTubeID(initialUrl)) meetingState.player.loadVideoById(extractYouTubeID(initialUrl));
+        meetingState.pendingVideoUrl = null;
         console.log("[YT] Player ready");
       },
       onStateChange: function (e) {
@@ -414,10 +429,151 @@ function extractYouTubeID(url) {
 
 function loadVideoUrl(url) {
   var ytid = extractYouTubeID(url);
-  if (ytid && meetingState.player && meetingState.playerReady) {
-    meetingState.player.loadVideoById(ytid);
-    document.getElementById("custom-video-url").value = url;
+  if (!ytid) {
+    showToast("Please use a valid YouTube trailer URL.");
+    return;
   }
+  meetingState.pendingVideoUrl = url;
+  var input = document.getElementById("custom-video-url");
+  if (input) input.value = url;
+  if (meetingState.player && meetingState.playerReady) {
+    meetingState.player.loadVideoById(ytid);
+    meetingState.pendingVideoUrl = null;
+  }
+}
+
+// WebRTC screen sharing. Audio is captured only when the browser/selected source permits it.
+function sendWebRTCSignal(targetId, payload) {
+  meetingState.socket.emit("webrtc_signal", {
+    code: meetingState.code,
+    target_id: targetId,
+    payload: payload
+  });
+}
+
+function createScreenPeer(peerId) {
+  if (meetingState.screenPeers[peerId]) return meetingState.screenPeers[peerId];
+  var pc = new RTCPeerConnection({
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+  });
+  meetingState.screenPeers[peerId] = pc;
+  if (meetingState.screenStream) {
+    meetingState.screenStream.getTracks().forEach(function (track) {
+      pc.addTrack(track, meetingState.screenStream);
+    });
+  }
+  pc.onicecandidate = function (event) {
+    if (event.candidate) sendWebRTCSignal(peerId, { type: "candidate", candidate: event.candidate });
+  };
+  pc.ontrack = function (event) {
+    var video = document.getElementById("remote-screen-video");
+    var stage = document.getElementById("remote-screen-share");
+    if (video && stage) {
+      video.srcObject = event.streams[0];
+      stage.style.display = "block";
+      video.play().catch(function () {
+        showToast("Screen share connected. Tap the shared video to enable playback/audio.");
+      });
+      var gallery = document.getElementById("gallery-grid");
+      var theater = document.getElementById("theater-mode-view");
+      if (gallery && theater) {
+        gallery.style.display = "none";
+        theater.style.display = "flex";
+        var galleryButton = document.getElementById("btn-view-gallery");
+        var theaterButton = document.getElementById("btn-view-theater");
+        if (galleryButton) galleryButton.classList.remove("active");
+        if (theaterButton) theaterButton.classList.add("active");
+      }
+    }
+  };
+  pc.onconnectionstatechange = function () {
+    if (["failed", "closed", "disconnected"].includes(pc.connectionState)) {
+      try { pc.close(); } catch (e) {}
+      delete meetingState.screenPeers[peerId];
+    }
+  };
+  return pc;
+}
+
+async function handleWebRTCSignal(message) {
+  if (!message || !message.payload || message.from_id === meetingState.socket.id) return;
+  var pc = createScreenPeer(message.from_id);
+  try {
+    var payload = message.payload;
+    if (payload.type === "offer") {
+      await pc.setRemoteDescription(new RTCSessionDescription(payload.description));
+      var answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      sendWebRTCSignal(message.from_id, { type: "answer", description: pc.localDescription });
+    } else if (payload.type === "answer") {
+      await pc.setRemoteDescription(new RTCSessionDescription(payload.description));
+    } else if (payload.type === "candidate" && payload.candidate) {
+      await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+    }
+  } catch (error) {
+    console.error("[SCREEN SHARE] WebRTC signaling failed", error);
+    showToast("Screen connection failed. Stop sharing and try again.");
+  }
+}
+
+async function startScreenShare() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+    showToast("Screen sharing requires HTTPS and a supported browser.");
+    return;
+  }
+  try {
+    meetingState.screenStream = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: { ideal: 15, max: 30 } },
+      audio: true
+    });
+    var shareButton = document.getElementById("btn-screen-share");
+    if (shareButton) shareButton.textContent = "■ Stop Sharing";
+    meetingState.socket.emit("screen_share_started", {
+      code: meetingState.code,
+      sender_name: meetingState.userName
+    });
+    meetingState.participants.forEach(async function (person) {
+      if (person.id === meetingState.socket.id) return;
+      var pc = createScreenPeer(person.id);
+      try {
+        var offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        sendWebRTCSignal(person.id, { type: "offer", description: pc.localDescription });
+      } catch (error) {
+        console.error("[SCREEN SHARE] Could not create offer", error);
+      }
+    });
+    var videoTrack = meetingState.screenStream.getVideoTracks()[0];
+    if (videoTrack) videoTrack.addEventListener("ended", stopScreenShare);
+    showToast("Sharing started. In Chrome, choose a tab and enable 'Share tab audio' for sound.");
+  } catch (error) {
+    if (error.name !== "NotAllowedError") showToast("Could not start screen sharing: " + error.message);
+  }
+}
+
+function stopScreenShare() {
+  if (meetingState.screenStream) {
+    meetingState.screenStream.getTracks().forEach(function (track) { track.stop(); });
+    meetingState.screenStream = null;
+  }
+  Object.keys(meetingState.screenPeers).forEach(function (id) {
+    try { meetingState.screenPeers[id].close(); } catch (e) {}
+    delete meetingState.screenPeers[id];
+  });
+  var shareButton = document.getElementById("btn-screen-share");
+  if (shareButton) shareButton.textContent = "🖥️ Share Screen + Audio";
+  meetingState.socket.emit("screen_share_stopped", { code: meetingState.code });
+  clearRemoteScreenShare();
+}
+
+function clearRemoteScreenShare() {
+  var stage = document.getElementById("remote-screen-share");
+  var video = document.getElementById("remote-screen-video");
+  if (video) {
+    if (video.srcObject) video.srcObject.getTracks().forEach(function (track) { track.stop(); });
+    video.srcObject = null;
+  }
+  if (stage) stage.style.display = "none";
 }
 
 function updatePlayBtnLabel(isPlaying) {
@@ -584,6 +740,13 @@ document.addEventListener("DOMContentLoaded", function () {
       inp.value = "";
     });
   }
+
+  // Screen sharing controls
+  var shareButton = document.getElementById("btn-screen-share");
+  if (shareButton) shareButton.addEventListener("click", function () {
+    if (meetingState.screenStream) stopScreenShare();
+    else startScreenShare();
+  });
 
   // 8. Video Sync Controls
   var btnPlay = document.getElementById("ctrl-play-pause");
