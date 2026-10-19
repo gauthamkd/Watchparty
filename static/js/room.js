@@ -19,6 +19,8 @@ var meetingState = {
   duration: 0,
   screenStream: null,
   screenPeers: {},
+  pendingVideoUrl: null,
+  pendingPlayback: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -84,9 +86,7 @@ function initSocket() {
     renderPolls(data.polls || []);
     updatePeopleCount();
 
-    if (data.video_url && data.video_url !== VIDEO_URL_INIT) {
-      loadVideoUrl(data.video_url);
-    }
+    if (data.video_url) loadVideoUrl(data.video_url);
   });
 
   meetingState.socket.on("update_participants", function (data) {
@@ -111,32 +111,26 @@ function initSocket() {
   });
 
   meetingState.socket.on("sync_play", function (data) {
-    if (meetingState.player && meetingState.playerReady) {
-      meetingState.player.seekTo(data.position, true);
-      meetingState.player.playVideo();
-      meetingState.isPlaying = true;
-      updatePlayBtnLabel(true);
-    }
+    meetingState.pendingPlayback = { action: "play", position: Number(data.position) || 0 };
+    applyPendingPlayback();
   });
 
   meetingState.socket.on("sync_pause", function (data) {
-    if (meetingState.player && meetingState.playerReady) {
-      meetingState.player.seekTo(data.position, true);
-      meetingState.player.pauseVideo();
-      meetingState.isPlaying = false;
-      updatePlayBtnLabel(false);
-    }
+    meetingState.pendingPlayback = { action: "pause", position: Number(data.position) || 0 };
+    applyPendingPlayback();
   });
 
   meetingState.socket.on("sync_seek", function (data) {
-    if (meetingState.player && meetingState.playerReady) {
-      meetingState.player.seekTo(data.position, true);
-    }
+    meetingState.pendingPlayback = { action: "seek", position: Number(data.position) || 0 };
+    applyPendingPlayback();
   });
 
   meetingState.socket.on("sync_video_change", function (data) {
     loadVideoUrl(data.url);
-    showToast("🎬 Host loaded new video");
+    setTheaterViewForSync();
+    meetingState.pendingPlayback = { action: "pause", position: 0 };
+    applyPendingPlayback();
+    showToast("🎬 Trailer loaded for everyone");
   });
 
   meetingState.socket.on("new_chat_message", function (msg) {
@@ -410,6 +404,7 @@ window.onYouTubeIframeAPIReady = function () {
         var initialUrl = meetingState.pendingVideoUrl || VIDEO_URL_INIT;
         if (extractYouTubeID(initialUrl)) meetingState.player.loadVideoById(extractYouTubeID(initialUrl));
         meetingState.pendingVideoUrl = null;
+        applyPendingPlayback();
         console.log("[YT] Player ready");
       },
       onStateChange: function (e) {
@@ -437,8 +432,41 @@ function loadVideoUrl(url) {
   var input = document.getElementById("custom-video-url");
   if (input) input.value = url;
   if (meetingState.player && meetingState.playerReady) {
-    meetingState.player.loadVideoById(ytid);
+    meetingState.player.loadVideoById(ytid, 0);
     meetingState.pendingVideoUrl = null;
+  }
+}
+
+function setTheaterViewForSync() {
+  meetingState.currentView = "theater";
+  var gallery = document.getElementById("gallery-grid");
+  var theater = document.getElementById("theater-mode-view");
+  var galleryButton = document.getElementById("btn-view-gallery");
+  var theaterButton = document.getElementById("btn-view-theater");
+  if (gallery) gallery.style.display = "none";
+  if (theater) theater.style.display = "flex";
+  if (galleryButton) galleryButton.classList.remove("active");
+  if (theaterButton) theaterButton.classList.add("active");
+}
+
+function applyPendingPlayback() {
+  if (!meetingState.player || !meetingState.playerReady || !meetingState.pendingPlayback) return;
+  var action = meetingState.pendingPlayback;
+  meetingState.pendingPlayback = null;
+  try {
+    meetingState.player.seekTo(action.position, true);
+    if (action.action === "play") {
+      meetingState.player.playVideo();
+      meetingState.isPlaying = true;
+      updatePlayBtnLabel(true);
+    } else if (action.action === "pause") {
+      meetingState.player.pauseVideo();
+      meetingState.isPlaying = false;
+      updatePlayBtnLabel(false);
+    }
+  } catch (err) {
+    console.warn("[YT] Could not apply synchronized playback yet", err);
+    meetingState.pendingPlayback = action;
   }
 }
 
