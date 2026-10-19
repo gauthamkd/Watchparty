@@ -1,4 +1,4 @@
-﻿"""
+"""
 WatchParty - Synchronized Watch Party with Zoom-Style 10-Person Meeting Room
 Port: 5001
 Author: Gautham
@@ -32,20 +32,7 @@ socketio = SocketIO(
     ping_interval=10
 )
 
-# ---------------------------------------------------------------------------
-# Default 8 Simulated Friends for the 10-Person Room Experience
-# ---------------------------------------------------------------------------
-DEFAULT_FRIENDS = [
-    {"id": "user_2", "name": "Sarah Jenkins", "avatar": "SJ", "bg": "#f43f5e", "role": "Participant", "audio": True, "video": True},
-    {"id": "user_3", "name": "Alex Rivera", "avatar": "AR", "bg": "#0ea5e9", "role": "Participant", "audio": True, "video": True},
-    {"id": "user_4", "name": "David Chen", "avatar": "DC", "bg": "#10b981", "role": "Participant", "audio": False, "video": True},
-    {"id": "user_5", "name": "Priya Sharma", "avatar": "PS", "bg": "#8b5cf6", "role": "Participant", "audio": True, "video": True},
-    {"id": "user_6", "name": "Marcus Vance", "avatar": "MV", "bg": "#f59e0b", "role": "Participant", "audio": True, "video": False},
-    {"id": "user_7", "name": "Elena Rostova", "avatar": "ER", "bg": "#ec4899", "role": "Participant", "audio": False, "video": True},
-    {"id": "user_8", "name": "Liam O'Connor", "avatar": "LO", "bg": "#14b8a6", "role": "Participant", "audio": True, "video": True},
-    {"id": "user_9", "name": "Chloe Bennett", "avatar": "CB", "bg": "#6366f1", "role": "Participant", "audio": True, "video": True},
-    {"id": "user_10", "name": "Noah Kim", "avatar": "NK", "bg": "#059669", "role": "Participant", "audio": True, "video": True},
-]
+# Only real users connected through Socket.IO are shown in a room.
 
 # Curated Movies with Trailor Links
 SAMPLE_MOVIES = [
@@ -109,37 +96,13 @@ def create_room():
     
     # Use the exact 6-digit code presented to the user on the landing page
     code = request.form.get("room_code", "").strip()
-    if not code or len(code) != 6 or not code.isdigit():
+    if not code or len(code) != 6 or not code.isdigit() or code in rooms:
         code = generate_6digit_code()
         while code in rooms:
             code = generate_6digit_code()
 
-    # Pre-populate participants with Host + 9 Friends = 10 People Total!
-    initial_participants = {
-        "host_placeholder": {
-            "id": "host_placeholder",
-            "name": f"{host_name} (Host, me)",
-            "avatar": host_name[:2].upper(),
-            "bg": "#2563eb",
-            "is_host": True,
-            "role": "Host",
-            "audio": True,
-            "video": True,
-            "is_bot": False,
-        }
-    }
-    for f in DEFAULT_FRIENDS:
-        initial_participants[f["id"]] = {
-            "id": f["id"],
-            "name": f["name"],
-            "avatar": f["avatar"],
-            "bg": f["bg"],
-            "is_host": False,
-            "role": f["role"],
-            "audio": f["audio"],
-            "video": f["video"],
-            "is_bot": True,
-        }
+    # Participants are added only when real browsers connect via Socket.IO.
+    initial_participants = {}
 
     rooms[code] = {
         "code": code,
@@ -155,33 +118,15 @@ def create_room():
         },
         "participants": initial_participants,
         "chat": [
-            {"name": "System", "text": f"Welcome to {room_name}! Room Code: {code}", "time": "Just now", "is_sys": True},
-            {"name": "Sarah Jenkins", "text": "Hey everyone! Popcorn is ready 🍿", "time": "1 min ago"},
-            {"name": "Alex Rivera", "text": "Audio and video check, all good!", "time": "Just now"},
-            {"name": "David Chen", "text": "Can someone share the movie trailer?", "time": "Just now"},
+            {"name": "System", "text": f"Welcome to {room_name}! Share the invite link to bring others in.", "time": "Just now", "is_sys": True}
         ],
-        "polls": [
-            {
-                "id": "poll_1",
-                "question": "What movie are we watching first tonight?",
-                "options": ["Interstellar", "Inception", "The Dark Knight", "Oppenheimer"],
-                "votes": {
-                    "Interstellar": ["user_2", "user_5", "user_8"],
-                    "Inception": ["user_3", "user_7"],
-                    "The Dark Knight": ["user_4", "user_6", "user_9"],
-                    "Oppenheimer": []
-                },
-                "created_by": "Sarah Jenkins",
-                "active": True
-            }
-        ],
+        "polls": [],
         "playlist": [
-            {"title": "Interstellar Official Trailer", "url": "https://www.youtube.com/watch?v=zSWdZVtXT7E", "added_by": host_name},
-            {"title": "Dune: Part Two Trailer", "url": "https://www.youtube.com/watch?v=Way9Dexny3w", "added_by": "Alex Rivera"},
+            {"title": "Interstellar Official Trailer", "url": "https://www.youtube.com/watch?v=zSWdZVtXT7E", "added_by": host_name}
         ]
     }
 
-    logger.info(f"[ZOOM ROOM CREATED] 6-Digit Code: {code} | Host: {host_name} | 10 Participants initialized")
+    logger.info(f"[ROOM CREATED] Code: {code} | Host: {host_name} | Waiting for real participants")
     return redirect(url_for("room", code=code, name=host_name, is_host="1"))
 
 
@@ -436,7 +381,8 @@ def handle_new_poll(data):
 if __name__ == "__main__":
     print("=" * 65)
     print("   WATCHPARTY (9-PERSON WHITE EDITION) IS RUNNING!")
-    print("   Port: 5001")
-    print("   Open in browser: http://localhost:5001")
+    port = int(os.environ.get("PORT", "5001"))
+    print(f"   Port: {port}")
+    print(f"   Open in browser: http://localhost:{port}")
     print("=" * 65)
-    socketio.run(app, host="0.0.0.0", port=5001, debug=True, allow_unsafe_werkzeug=True)
+    socketio.run(app, host="0.0.0.0", port=port, debug=False, allow_unsafe_werkzeug=True)
