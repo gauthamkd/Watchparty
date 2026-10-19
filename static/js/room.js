@@ -221,8 +221,10 @@ function updatePeopleCount() {
   var count = meetingState.participants.length;
   var el1 = document.getElementById("people-count");
   var el2 = document.getElementById("dock-people-count");
+  var el3 = document.getElementById("meeting-info-people-count");
   if (el1) el1.textContent = count;
   if (el2) el2.textContent = count;
+  if (el3) el3.textContent = count + (count === 1 ? " Person Connected" : " People Connected");
 }
 
 // ---------------------------------------------------------------------------
