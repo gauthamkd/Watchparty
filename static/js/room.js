@@ -812,7 +812,18 @@ document.addEventListener("DOMContentLoaded", function () {
   if (btnLoadVid) {
     btnLoadVid.addEventListener("click", function () {
       var url = document.getElementById("custom-video-url").value.trim();
-      if (url) {
+      if (!url) return;
+      if (!extractYouTubeID(url)) {
+        showToast("Please use a valid YouTube trailer URL.");
+        return;
+      }
+      // Update the host's own player immediately; do not rely on receiving
+      // the server's room broadcast back to the same socket.
+      setTheaterViewForSync();
+      loadVideoUrl(url);
+      meetingState.pendingPlayback = { action: "pause", position: 0 };
+      applyPendingPlayback();
+      if (meetingState.socket && meetingState.socket.connected) {
         meetingState.socket.emit("change_video_url", { code: meetingState.code, url: url });
       }
     });
