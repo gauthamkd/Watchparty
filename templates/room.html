@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -27,7 +27,7 @@
 
     <div class="top-bar-center">
       <div class="view-switcher">
-        <button class="view-btn active" id="btn-view-gallery">👥 10-Person Gallery</button>
+        <button class="view-btn active" id="btn-view-gallery">👥 Participant Gallery</button>
         <button class="view-btn" id="btn-view-theater">🎬 Watch Party Theater</button>
       </div>
       <div class="sync-status-badge">
@@ -49,10 +49,10 @@
   <!-- Main Conference Layout -->
   <div class="conference-container">
 
-    <!-- Center Stage: Switches between 10-Person Video Grid and Movie Theater -->
+    <!-- Center Stage: Switches between live participant grid and Movie Theater -->
     <main class="conference-stage" id="conference-stage">
 
-      <!-- View A: 10-Person Zoom Gallery Grid (3x3) -->
+      <!-- View A: Live participant gallery -->
       <div class="zoom-gallery-grid" id="gallery-grid">
         <!-- 9 Video Tiles populated via JavaScript & Initial Server Render -->
       </div>
@@ -64,7 +64,7 @@
             <input type="text" id="custom-video-url" placeholder="Paste any YouTube URL or video link..." value="{{ video_url }}">
             <button class="btn-load-vid" id="btn-load-vid">▶ Load for Everyone</button>
           </div>
-          <div class="strip-notice">Synced across all 9 participants in real-time</div>
+          <div class="strip-notice">Playback synced for everyone in the room</div>
         </div>
 
         <div class="theater-player-frame" id="theater-player-frame">
@@ -140,7 +140,7 @@
             <span class="quick-em" onclick="insertEmoji('👏')">👏</span>
           </div>
           <form id="chat-form" class="chat-form-row">
-            <input type="text" id="chat-text-input" placeholder="Type message to 10 people..." autocomplete="off">
+            <input type="text" id="chat-text-input" placeholder="Type a message..." autocomplete="off">
             <button type="submit" class="btn-chat-send">Send</button>
           </form>
         </div>
@@ -189,7 +189,7 @@
       <div class="dock-group dock-center-group">
         <button class="dock-btn active" id="dock-btn-people">
           <div class="dock-icon-wrapper">👥</div>
-          <span class="dock-label">Participants (<span id="dock-people-count">10</span>)</span>
+          <span class="dock-label">Participants (<span id="dock-people-count">0</span>)</span>
         </button>
         <button class="dock-btn" id="dock-btn-chat">
           <div class="dock-icon-wrapper">💬</div>
@@ -241,7 +241,7 @@
         <h3>👑 Transfer Host Role</h3>
         <button class="modal-close" onclick="closeModal('modal-host-transfer')">✕</button>
       </div>
-      <p class="modal-desc">Select any participant in the 10-person room to make them the new meeting host:</p>
+      <p class="modal-desc">Select a connected participant to make them the new meeting host:</p>
       <div class="host-candidates-list" id="host-candidates-list">
         <!-- Rendered via JS -->
       </div>
@@ -273,7 +273,7 @@
         </div>
         <div class="detail-row">
           <span class="detail-label">Active Participants:</span>
-          <span class="detail-val">10 People Connected</span>
+          <span class="detail-val" id="meeting-info-people-count">0 People Connected</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">Direct Invite URL:</span>
